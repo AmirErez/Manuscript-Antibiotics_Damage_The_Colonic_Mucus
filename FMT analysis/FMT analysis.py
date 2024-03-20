@@ -20,7 +20,7 @@ def merge_data_yasmin(normalize=True):
     df = pd.DataFrame()
     for abx in antibiotics + ["PBS"]:
         for treatment in treatments:
-            temp = pd.read_csv(f"../Data/Yasmin_FMT/{abx}_{treatment}_genes_norm_named.tsv", sep="\t")
+            temp = pd.read_csv(f"./FMT Data/Yasmin_FMT/{abx}_{treatment}_genes_norm_named.tsv", sep="\t")
             temp = temp.drop("gene_id", axis=1).set_index("gene_name")
             # sum all rows with the same gene_name
             temp = temp.groupby(temp.index).sum()
@@ -452,7 +452,7 @@ def plot_neo_van_clusters():
 
 
 if __name__ == "__main__":
-    metadata = pd.read_csv("../Data/Yasmin_FMT/metadata-Yasmin_FMT.tsv", sep="\t")
+    metadata = pd.read_csv("./FMT Data/Yasmin_FMT/metadata-Yasmin_FMT.tsv", sep="\t")
     # create columns Drug and Treatment, based on group.split("_") accordingly ([0] is drug, [1] is treatment)
     metadata["Drug"] = metadata["group"].apply(lambda x: x.split("_")[0])
     metadata["Treatment"] = metadata["group"].apply(lambda x: x.split("_")[1])
