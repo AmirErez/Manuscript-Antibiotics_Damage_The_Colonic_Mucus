@@ -80,12 +80,6 @@ def four_way_forest(df, feature_columns, target_column, test_size=8 / 28, random
     # create a dictionary of the labels using the label encoder
     labels_dict = {i: label for i, label in enumerate(label_encoder.classes_)}
 
-    print("Actual Labels:")
-    print(labels_dict)
-    print("\nConfusion Matrix:")
-    print(conf_matrix)
-    print("\nClassification Report:")
-    print(classification_rep)
     # convert classification report to a DataFrame
     report = classification_report_to_df(classification_rep)
     # get features importance
@@ -389,7 +383,7 @@ def plot_neo_van_clusters():
     meta = pd.read_csv("./FMT_Data/neo_van_ip_metadata.csv")
     # read the transcriptome
     transcriptome = pd.read_csv("./FMT_Data/neo_van_ip.csv", index_col=0)
-    genes = pd.read_csv(f"./private/neo_van_ip_significant.csv")
+    genes = pd.read_csv(f"./Private/neo_van_ip_significant.csv")
     transcriptome = transcriptome.loc[genes["gene_name"]]
 
     # plot the heatmap
