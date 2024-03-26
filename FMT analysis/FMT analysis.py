@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
+from scipy.stats import ttest_ind
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import confusion_matrix, classification_report
 from sklearn.model_selection import train_test_split
@@ -33,6 +34,7 @@ def merge_data_yasmin(normalize=True):
                 temp = temp.div(temp.sum(axis=0), axis=1) * 1_000_000
             # merge temp with df based on index
             df = pd.concat([df, temp], axis=1)
+
     # save df to a file
     df.to_csv(f"./Private/Yasmin_FMT_merged{'_normalized' if normalize else ''}.tsv", sep="\t",
               index=True)
@@ -102,6 +104,7 @@ def classification_report_to_df(report_str):
         values = re.findall(r'\b\d+\.?\d*\b', line)
         if values:
             data.append(values)
+
     # Create a Pandas DataFrame
     df = pd.DataFrame(data, columns=column_names)
     # set precision to index, rename recall to precision, f1 to recall, score to f1-score
@@ -247,7 +250,6 @@ def plot_heatmap_colors(cluster, col_cluster, save_name, top_df, normalize=True,
         # Customize tick labels, modifying the last label to indicate a limit
         last = f"{ticks[-1]:.0f}+" if actual_vmax == vmax else actual_vmax
         tick_labels = [f"{tick:.0f}" for tick in ticks[:-1]] + [last]  # Add '+' to the last label
-        # Apply the customized tick labels
         cbar.set_ticklabels(tick_labels)
 
     if not colors:
@@ -338,61 +340,6 @@ def plot_heatmap_colors_short(save_name, top_df, normalize=True, colors=None, ti
     plt.close()
 
 
-def calc_all_statistics(df, meta):
-    # remove empty rows
-    df = df.loc[~(df == 0).all(axis=1)]
-    from scipy.stats import ttest_ind
-    all_stats = pd.DataFrame()
-    all_stats.index = df.index
-    for treat in treatments:
-        abx_data = meta[(meta['Drug'] == "VANCO") & (meta["Treatment"] == treat)]['ID'].values
-        pbs_data = meta[(meta['Drug'] == 'PBS') & (meta["Treatment"] == treat)]['ID'].values
-        # temp = raw.loc[np.concatenate(abx_data, pbs_data)]
-        ttest_pvalues = df.apply(lambda row: ttest_ind(row[abx_data], row[pbs_data])[1], axis=1)
-        # Calculate the fold changes
-        fold_changes = df.apply(lambda row: np.log2(np.median(row[abx_data]) / np.median(row[pbs_data])), axis=1)
-        # add the p-values and fold changes to the all_stats df
-        all_stats = pd.concat([all_stats, pd.DataFrame(
-            {f"p-value_{treat}": ttest_pvalues, f"fold_change_{treat}": fold_changes}, index=df.index)], axis=1)
-    for abx in antibiotics + ["PBS"]:
-        donor_data = meta[(meta['Drug'] == abx) & (meta["Treatment"] == "DONOR")]['ID'].values
-        recipient_data = meta[(meta['Drug'] == abx) & (meta["Treatment"] == "RECIPIENT")]['ID'].values
-        # temp = raw.loc[np.concatenate(abx_data, pbs_data)]
-        ttest_pvalues = df.apply(lambda row: ttest_ind(row[donor_data], row[recipient_data])[1], axis=1)
-        # Calculate the fold changes
-        fold_changes = df.apply(lambda row: np.log2(np.median(row[donor_data]) / np.median(row[recipient_data])),
-                                axis=1)
-        # add the p-values and fold changes to the all_stats df
-        all_stats = pd.concat([all_stats, pd.DataFrame(
-            {f"p-value_{abx}": ttest_pvalues, f"fold_change_{abx}": fold_changes}, index=df.index)], axis=1)
-
-    donor_van = meta[(meta['Drug'] == "VANCO") & (meta["Treatment"] == "DONOR")]['ID'].values
-    recipient_pbs = meta[(meta['Drug'] == "PBS") & (meta["Treatment"] == "RECIPIENT")]['ID'].values
-    # temp = raw.loc[np.concatenate(abx_data, pbs_data)]
-    ttest_pvalues = df.apply(lambda row: ttest_ind(row[donor_van], row[recipient_pbs])[1], axis=1)
-    # Calculate the fold changes
-    fold_changes = df.apply(lambda row: np.log2(np.median(row[donor_van]) / np.median(row[recipient_pbs])),
-                            axis=1)
-    # add the p-values and fold changes to the all_stats df
-    all_stats = pd.concat([all_stats, pd.DataFrame(
-        {f"p-value_van_donor_pbs_recipient": ttest_pvalues, f"fold_change_van_donor_pbs_recipient": fold_changes},
-        index=df.index)], axis=1)
-
-    donor_pbs = meta[(meta['Drug'] == "PBS") & (meta["Treatment"] == "DONOR")]['ID'].values
-    recipient_van = meta[(meta['Drug'] == "VANCO") & (meta["Treatment"] == "RECIPIENT")]['ID'].values
-    # temp = raw.loc[np.concatenate(abx_data, pbs_data)]
-    ttest_pvalues = df.apply(lambda row: ttest_ind(row[donor_pbs], row[recipient_van])[1], axis=1)
-    # Calculate the fold changes
-    fold_changes = df.apply(lambda row: np.log2(np.median(row[donor_pbs]) / np.median(row[recipient_van])),
-                            axis=1)
-    # add the p-values and fold changes to the all_stats df
-    all_stats = pd.concat([all_stats, pd.DataFrame(
-        {f"p-value_pbs_donor_van_recipient": ttest_pvalues, f"fold_change_pbs_donor_van_recipient": fold_changes},
-        index=df.index)], axis=1)
-
-    all_stats.to_csv("./Private/all_stats.csv")
-
-
 def plot_confusion_matrix():
     # plot it as a heatmap, make x label "predicted", y label "true"
     import matplotlib.pyplot as plt
@@ -409,8 +356,25 @@ def plot_confusion_matrix():
     plt.close()
 
 
+def calc_neo_van_statistics():
+    df = pd.read_csv("./FMT Data/neo_van_ip.csv").set_index("gene_name")
+    meta = pd.read_csv("./FMT Data/neo_van_ip_metadata.csv")
+    df = df.loc[~(df == 0).all(axis=1)]
+    all_stats = pd.DataFrame()
+    all_stats.index = df.index
+    for abx in ["Neo", "Van"]:
+        abx_data = meta[(meta['Drug'] == abx) & (meta["Treatment"] == "IP")]['ID'].values
+        pbs_data = meta[(meta['Drug'] == 'PBS') & (meta["Treatment"] == "IP")]['ID'].values
+        ttest_pvalues = df.apply(lambda row: ttest_ind(row[abx_data], row[pbs_data])[1], axis=1)
+        fold_changes = df.apply(lambda row: np.log2(np.median(row[abx_data]) / np.median(row[pbs_data])), axis=1)
+        # add the p-values and fold changes to the all_stats df
+        all_stats = pd.concat([all_stats, pd.DataFrame(
+            {f"p-value_{abx}_IP": ttest_pvalues, f"fold_change_{abx}_IP": fold_changes}, index=df.index)], axis=1)
+    all_stats.to_csv("./Private/all_stats_neo_van_ip.csv")
+
+
 def neo_van_ip_significant_same_trend():
-    all_stat = pd.read_csv("./Private/all_stats.csv")
+    all_stat = pd.read_csv("./Private/all_stats_neo_van_ip.csv")
     # keep only rows where p-value_Neo_IP < 0.05 and p-value_Van_IP < 0.05
     all_stat = all_stat[(all_stat["p-value_Neo_IP"] < 0.05) & (all_stat["p-value_Van_IP"] < 0.05)]
     # keep only rows where fold_change_Neo_IP and fold_change_Van_IP has the same sign
@@ -421,10 +385,10 @@ def neo_van_ip_significant_same_trend():
 
 def plot_neo_van_clusters():
     # read the metadata
-    meta = pd.read_csv("./Private/neo_van_ip_metadata.csv")
+    meta = pd.read_csv("./FMT Data/neo_van_ip_metadata.csv")
     # read the transcriptome
-    transcriptome = pd.read_csv("./Private/neo_van_ip.csv", index_col=0)
-    genes = pd.read_csv(f"./Private/neo_van_ip_significant.csv")
+    transcriptome = pd.read_csv("./FMT Data/neo_van_ip.csv", index_col=0)
+    genes = pd.read_csv(f"./private/neo_van_ip_significant.csv")
     transcriptome = transcriptome.loc[genes["gene_name"]]
 
     # plot the heatmap
@@ -435,6 +399,8 @@ def plot_neo_van_clusters():
     # z-score trancriptome by pbs
     transcriptome = transcriptome.sub(transcriptome[pbs["ID"]].mean(axis=1), axis=0)
     transcriptome = transcriptome.div(transcriptome[pbs["ID"]].std(axis=1), axis=0)
+    # remove rows with nan values
+    transcriptome = transcriptome.dropna()
     transcriptome.to_csv("./Private/neo_van_ip_significant_genes_zscore.csv")
 
     cluster = sns.clustermap(transcriptome, metric="correlation", method="average", row_cluster=True,
@@ -457,12 +423,12 @@ if __name__ == "__main__":
     metadata["Drug"] = metadata["group"].apply(lambda x: x.split("_")[0])
     metadata["Treatment"] = metadata["group"].apply(lambda x: x.split("_")[1])
     metadata = metadata.rename(columns={"sample": "ID"})
-    data = merge_data_yasmin()
+    data = merge_data_yasmin(normalize=True)
 
-    # four_way_random_forest(data, metadata)
-    # plot_confusion_matrix()
-    # analyze_genes_results(data, metadata, sizes=(50, 100, 200, 400, 500))
+    four_way_random_forest(data, metadata)
+    plot_confusion_matrix()
+    analyze_genes_results(data, metadata, sizes=(50, 100, 200, 400, 500))
 
-    # calc_all_statistics(data, metadata)
+    calc_neo_van_statistics()
     neo_van_ip_significant_same_trend()
     plot_neo_van_clusters()
