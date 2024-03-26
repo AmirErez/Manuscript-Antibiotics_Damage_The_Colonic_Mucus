@@ -418,6 +418,9 @@ def plot_neo_van_clusters():
 
 
 if __name__ == "__main__":
+    # if not exists, create a Private directory
+    if not os.path.exists("./Private"):
+        os.mkdir("./Private")
     metadata = pd.read_csv("./FMT Data/Yasmin_FMT/metadata-Yasmin_FMT.tsv", sep="\t")
     # create columns Drug and Treatment, based on group.split("_") accordingly ([0] is drug, [1] is treatment)
     metadata["Drug"] = metadata["group"].apply(lambda x: x.split("_")[0])
